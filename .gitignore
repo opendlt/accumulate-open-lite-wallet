@@ -1,0 +1,158 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# ===== WALLET-SPECIFIC SECURITY =====
+
+# Private keys and certificates (CRITICAL - NEVER COMMIT)
+*.key
+*.pem
+*.p12
+*.pfx
+*.keystore
+*.jks
+android/app/key.properties
+android/keystore/
+ios/fastlane/
+
+# Database files (contain sensitive wallet data)
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+
+# Environment and configuration files
+.env
+.env.*
+config.json
+secrets.json
+firebase_options.dart
+
+# Wallet data directories
+wallet_data/
+user_data/
+keys/
+certificates/
+
+# Development logs that might contain sensitive info
+flutter_*.log
+*.log
+logs/
+
+# Platform-specific sensitive files
+# iOS
+ios/Runner/GoogleService-Info.plist
+ios/firebase_app_id_file.json
+
+# Android
+android/app/google-services.json
+android/app/src/main/res/values/strings_secrets.xml
+
+# Windows
+windows/runner/secrets.h
+
+# macOS
+macos/Runner/GoogleService-Info.plist
+
+# ===== BUILD AND TEMPORARY FILES =====
+
+# Additional Flutter build artifacts
+*.dill
+*.incremental
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Platform build directories
+build/
+**/build/
+
+# Test coverage
+coverage/
+test/coverage/
+
+# Generated files
+*.g.dart
+*.freezed.dart
+*.gr.dart
+**/*.g.dart
+**/*.freezed.dart
+**/*.gr.dart
+
+# Platform runners (if customized with secrets)
+# Uncomment these if you store sensitive data in runner files
+# android/app/src/main/kotlin/
+# ios/Runner/
+# linux/
+# macos/
+# windows/
+# web/
+
+# Backup and temporary files
+*.backup
+*.tmp
+*~
+.#*
+
+# ===== DEVELOPMENT FILES =====
+
+# Documentation that might contain internal info
+INTERNAL_NOTES.md
+TODO_PRIVATE.md
+SECRETS.md
+
+# Development status files (these contain internal project info)
+BUILD_STATUS.md
+COMPILATION_STATUS.md
+IMPLEMENTATION_SUMMARY.md
+
+# Test data with potentially sensitive info
+test_data/
+mock_data/
+
+# Debug and profiling files
+isolate_snapshot_data
+vm_snapshot_data
+kernel_snapshot.dill
