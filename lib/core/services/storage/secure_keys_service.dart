@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 // Enhanced secure storage service for managing cryptographic keys
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:crypto/crypto.dart';
@@ -32,8 +33,23 @@ class SecureKeysService {
 
   /// Store a private key for a specific account address
   Future<void> storePrivateKey(String address, String privateKey) async {
-    final key = _privateKeyPrefix + address;
-    await _storage.write(key: key, value: privateKey);
+    try {
+      final key = _privateKeyPrefix + address;
+      debugPrint('Attempting to store private key with key: $key');
+      await _storage.write(key: key, value: privateKey);
+      debugPrint(' Private key stored successfully in secure storage');
+
+      // Verify it was stored by reading it back
+      final stored = await _storage.read(key: key);
+      if (stored != null) {
+        debugPrint(' Verification successful - key can be read back');
+      } else {
+        debugPrint(' Verification failed - key not found after storing');
+      }
+    } catch (e) {
+      debugPrint(' Error storing private key: $e');
+      rethrow;
+    }
   }
 
   /// Retrieve a private key for a specific account address

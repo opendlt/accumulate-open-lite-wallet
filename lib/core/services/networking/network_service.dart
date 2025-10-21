@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 // Core networking service - no Flutter dependencies
 import 'dart:convert';
 import 'package:http/http.dart' as http;
@@ -12,6 +13,11 @@ class NetworkService {
 
   /// Generic GET request
   Future<NetworkResult> get(String url, {Map<String, String>? headers}) async {
+    debugPrint('GET Request: $url');
+    if (headers != null && headers.isNotEmpty) {
+      debugPrint('Headers: ${jsonEncode(headers)}');
+    }
+
     try {
       final response = await http
           .get(
@@ -20,6 +26,12 @@ class NetworkService {
           )
           .timeout(timeout);
 
+      debugPrint(' GET Response: Status ${response.statusCode}');
+      debugPrint('Response Body: ${response.body}');
+      if (response.headers.isNotEmpty) {
+        debugPrint('Response Headers: ${jsonEncode(response.headers)}');
+      }
+
       return NetworkResult(
         success: response.statusCode >= 200 && response.statusCode < 300,
         statusCode: response.statusCode,
@@ -27,6 +39,7 @@ class NetworkService {
         headers: response.headers,
       );
     } catch (e) {
+      debugPrint(' GET Error: $e');
       return NetworkResult(
         success: false,
         error: e.toString(),
@@ -40,14 +53,28 @@ class NetworkService {
     Map<String, String>? headers,
     dynamic body,
   }) async {
+    final requestBody = body is String ? body : jsonEncode(body);
+
+    debugPrint('POST Request: $url');
+    if (headers != null && headers.isNotEmpty) {
+      debugPrint('Headers: ${jsonEncode(headers)}');
+    }
+    debugPrint('Request Body: $requestBody');
+
     try {
       final response = await http
           .post(
             Uri.parse(url),
             headers: headers ?? {'Content-Type': 'application/json'},
-            body: body is String ? body : jsonEncode(body),
+            body: requestBody,
           )
           .timeout(timeout);
+
+      debugPrint(' POST Response: Status ${response.statusCode}');
+      debugPrint('Response Body: ${response.body}');
+      if (response.headers.isNotEmpty) {
+        debugPrint('Response Headers: ${jsonEncode(response.headers)}');
+      }
 
       return NetworkResult(
         success: response.statusCode >= 200 && response.statusCode < 300,
@@ -56,6 +83,7 @@ class NetworkService {
         headers: response.headers,
       );
     } catch (e) {
+      debugPrint(' POST Error: $e');
       return NetworkResult(
         success: false,
         error: e.toString(),

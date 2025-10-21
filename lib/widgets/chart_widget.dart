@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../core/services/storage/database_helper.dart';
+import '../core/services/balance/balance_aggregation_service.dart';
 import '../core/models/local_storage_models.dart';
 
 class ChartWidget extends StatefulWidget {
@@ -13,9 +14,10 @@ class ChartWidget extends StatefulWidget {
 class _ChartWidgetState extends State<ChartWidget> {
   bool _isLineChart = true;
   List<PriceData> _priceData = [];
-  List<AccountBalance> _accountBalances = [];
+  List<AccountBalancePercentage> _accountBalances = [];
   bool _isLoading = true;
   final DatabaseHelper _dbHelper = DatabaseHelper();
+  final BalanceAggregationService _balanceService = BalanceAggregationService();
 
   @override
   void initState() {
@@ -24,41 +26,47 @@ class _ChartWidgetState extends State<ChartWidget> {
   }
 
   Future<void> _loadChartData() async {
-    // First, show UI immediately with empty/demo data
+    // First, show UI immediately with cached data
     if (mounted) {
       setState(() {
         _isLoading = false; // Show UI immediately
         // Initialize with minimal demo data for immediate display
         _priceData = _generateQuickDemoData();
-        _accountBalances = _generateQuickAccountData();
+        _accountBalances = [];
       });
     }
 
-    // Then load real data in background
+    // Load cached balance data first (fast)
     try {
-      // Only generate dummy data if database is completely empty
+      final balanceSummary = await _balanceService.getBalanceSummary();
+
+      if (mounted) {
+        setState(() {
+          _accountBalances = balanceSummary.accountBalances;
+        });
+      }
+
+      debugPrint('CHART WIDGET: Loaded ${_accountBalances.length} account balances');
+      debugPrint('CHART WIDGET: Total balance: ${balanceSummary.totalBalance.toStringAsFixed(8)} ACME');
+
+      // Load price data
       final existingPriceData = await _dbHelper.getPriceData();
-      final existingAccountData = await _dbHelper.getAccountBalances();
 
       if (existingPriceData.isEmpty) {
         await _dbHelper.generateDummyPriceData();
       }
-      if (existingAccountData.isEmpty) {
-        await _dbHelper.generateDummyAccountBalances();
-      }
 
-      // Load the data
+      // Load the price data only
       final priceData = await _dbHelper.getPriceData();
-      final accountBalances = await _dbHelper.getAccountBalances();
 
       if (mounted) {
         setState(() {
           _priceData = priceData;
-          _accountBalances = accountBalances;
+          // Keep the real account balances from balance service
         });
       }
     } catch (e) {
-      print('Info: Using demo chart data - $e');
+      debugPrint('Info: Using demo chart data - $e');
       // Continue with demo data if database fails
     }
   }
@@ -74,34 +82,15 @@ class _ChartWidgetState extends State<ChartWidget> {
     });
   }
 
-  List<AccountBalance> _generateQuickAccountData() {
-    return [
-      AccountBalance(
-        accountAddress: 'demo-account-1',
-        accountName: 'Demo Account 1',
-        acmeBalance: 150.0,
-        accountType: 'lite_account',
-        updatedAt: DateTime.now(),
-      ),
-      AccountBalance(
-        accountAddress: 'demo-account-2',
-        accountName: 'Demo Account 2',
-        acmeBalance: 75.0,
-        accountType: 'token_account',
-        updatedAt: DateTime.now(),
-      ),
-    ];
-  }
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      elevation: 4,
-      margin: const EdgeInsets.all(16),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        height: 350,
-        child: Column(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: SizedBox(
+          height: 350,
+          child: Column(
           children: [
             // Chart toggle header
             Row(
@@ -144,6 +133,7 @@ class _ChartWidgetState extends State<ChartWidget> {
                       : _buildPieChart(),
             ),
           ],
+          ),
         ),
       ),
     );
@@ -231,7 +221,8 @@ class _ChartWidgetState extends State<ChartWidget> {
     if (_accountBalances.isEmpty) {
       return const Center(
         child: Text(
-          'No account data available',
+          'No wallet accounts found\nCreate accounts to see portfolio distribution',
+          textAlign: TextAlign.center,
           style: TextStyle(fontSize: 16, color: Colors.grey),
         ),
       );
@@ -242,17 +233,26 @@ class _ChartWidgetState extends State<ChartWidget> {
       (sum, account) => sum + account.acmeBalance,
     );
 
-    final colors = [Colors.blue, Colors.green, Colors.orange, Colors.purple, Colors.red];
+    if (totalBalance == 0) {
+      return const Center(
+        child: Text(
+          'No ACME balance found\nAdd ACME to your accounts to see distribution',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 16, color: Colors.grey),
+        ),
+      );
+    }
+
+    final colors = [Colors.blue, Colors.green, Colors.orange, Colors.purple, Colors.red, Colors.teal, Colors.amber, Colors.pink];
 
     final sections = _accountBalances.asMap().entries.map((entry) {
       final index = entry.key;
       final account = entry.value;
-      final percentage = (account.acmeBalance / totalBalance) * 100;
 
       return PieChartSectionData(
         color: colors[index % colors.length],
         value: account.acmeBalance,
-        title: '${percentage.toStringAsFixed(1)}%',
+        title: '${account.percentage.toStringAsFixed(1)}%',
         radius: 60,
         titleStyle: const TextStyle(
           fontSize: 12,

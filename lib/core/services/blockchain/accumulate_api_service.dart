@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 // Core Accumulate blockchain API service - no Flutter dependencies
 import 'dart:convert';
 import 'package:http/http.dart' as http;
@@ -11,8 +12,10 @@ class AccumulateApiService {
   final NetworkService _networkService;
 
   AccumulateApiService({
-    this.baseUrl = AppConstants.defaultAccumulateTestnetUrl,
-  }) : _networkService = NetworkService();
+    this.baseUrl = AppConstants.defaultAccumulateDevnetUrl,
+  }) : _networkService = NetworkService() {
+    debugPrint('Accumulate API Service initialized with endpoint: $baseUrl');
+  }
 
   /// Query account balance
   Future<AccountBalance?> getAccountBalance(String accountUrl) async {

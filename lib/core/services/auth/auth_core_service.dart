@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 // Core authentication business logic - no Flutter dependencies
 
 class AuthCoreService {

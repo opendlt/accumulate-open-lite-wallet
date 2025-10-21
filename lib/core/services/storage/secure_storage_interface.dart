@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 // Core storage interface - no Flutter dependencies
 
 /// Abstract interface for secure storage operations

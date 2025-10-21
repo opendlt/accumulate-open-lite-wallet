@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 // Unified wallet storage service combining SQLite and secure storage
 import 'database_helper.dart';
 import 'secure_keys_service.dart';
-import '../../models/local_storage_models.dart';
+import '../../models/local_storage_models.dart' hide TransactionRecord;
+import '../../models/accumulate_requests.dart' show TransactionRecord;
 import 'dart:typed_data';
 
 class WalletStorageService {
@@ -16,7 +18,6 @@ class WalletStorageService {
 
   /// Create a new wallet account with both public data and secure keys
   Future<WalletAccount> createAccount({
-    required String name,
     required String address,
     required String accountType,
     String? privateKey,
@@ -25,13 +26,9 @@ class WalletStorageService {
     Uint8List? seed,
     Map<String, dynamic>? metadata,
   }) async {
-    final now = DateTime.now();
     final account = WalletAccount(
-      name: name,
       address: address,
       accountType: accountType,
-      createdAt: now,
-      updatedAt: now,
       metadata: metadata,
     );
 
@@ -40,11 +37,16 @@ class WalletStorageService {
     final savedAccount = account.copyWith(id: accountId);
 
     // Store sensitive keys in secure storage
+    debugPrint('Storing keys for address: $address');
     if (privateKey != null) {
+      debugPrint('Storing private key...');
       await _secureKeys.storePrivateKey(address, privateKey);
+      debugPrint(' Private key stored successfully');
     }
     if (publicKey != null) {
+      debugPrint('Storing public key...');
       await _secureKeys.storePublicKey(address, publicKey);
+      debugPrint('Public key stored successfully');
     }
     if (mnemonic != null) {
       await _secureKeys.storeMnemonic(address, mnemonic);
@@ -122,7 +124,7 @@ class WalletStorageService {
     required String txHash,
     required String fromAddress,
     required String toAddress,
-    required String amount,
+    required int amount,
     required String tokenType,
     required String transactionType,
     String status = 'pending',
@@ -130,16 +132,16 @@ class WalletStorageService {
     Map<String, dynamic>? metadata,
   }) async {
     final transaction = TransactionRecord(
-      txHash: txHash,
-      fromAddress: fromAddress,
-      toAddress: toAddress,
+      transactionId: txHash,
+      type: transactionType,
+      direction: fromAddress == toAddress ? 'Internal' : 'Outgoing',
+      fromUrl: fromAddress,
+      toUrl: toAddress,
       amount: amount,
-      tokenType: tokenType,
-      transactionType: transactionType,
+      tokenUrl: tokenType,
       timestamp: DateTime.now(),
       status: status,
       memo: memo,
-      metadata: metadata,
     );
 
     await _dbHelper.insertTransaction(transaction);
@@ -152,7 +154,7 @@ class WalletStorageService {
     int limit = 50,
     int offset = 0,
   }) async {
-    return await _dbHelper.getTransactionHistory(
+    return _dbHelper.getTransactionHistory(
       address: address,
       limit: limit,
       offset: offset,
@@ -207,49 +209,6 @@ class WalletStorageService {
     return await getPreference<bool>('biometric_auth_enabled', defaultValue: false) ?? false;
   }
 
-  // ===== ADDRESS BOOK MANAGEMENT =====
-
-  /// Add an entry to the address book
-  Future<AddressBookEntry> addAddressBookEntry({
-    required String name,
-    required String address,
-    String? notes,
-    bool isFavorite = false,
-  }) async {
-    final now = DateTime.now();
-    final entry = AddressBookEntry(
-      name: name,
-      address: address,
-      notes: notes,
-      createdAt: now,
-      updatedAt: now,
-      isFavorite: isFavorite,
-    );
-
-    final entryId = await _dbHelper.insertAddressBookEntry(entry);
-    return entry.copyWith(id: entryId);
-  }
-
-  /// Get all address book entries
-  Future<List<AddressBookEntry>> getAddressBook() async {
-    return await _dbHelper.getAddressBook();
-  }
-
-  /// Get favorite addresses
-  Future<List<AddressBookEntry>> getFavoriteAddresses() async {
-    return await _dbHelper.getFavoriteAddresses();
-  }
-
-  /// Update an address book entry
-  Future<void> updateAddressBookEntry(AddressBookEntry entry) async {
-    final updatedEntry = entry.copyWith(updatedAt: DateTime.now());
-    await _dbHelper.updateAddressBookEntry(updatedEntry);
-  }
-
-  /// Delete an address book entry
-  Future<void> deleteAddressBookEntry(int entryId) async {
-    await _dbHelper.deleteAddressBookEntry(entryId);
-  }
 
   // ===== AUTHENTICATION MANAGEMENT =====
 
@@ -282,7 +241,6 @@ class WalletStorageService {
     final accounts = await _dbHelper.getAllAccounts();
     final transactions = await _dbHelper.getTransactionHistory(limit: 1000);
     final preferences = await _dbHelper.getAllPreferences();
-    final addressBook = await _dbHelper.getAddressBook();
 
     return {
       'version': '1.0',
@@ -290,7 +248,6 @@ class WalletStorageService {
       'accounts': accounts.map((a) => a.toMap()).toList(),
       'transactions': transactions.map((t) => t.toMap()).toList(),
       'preferences': preferences,
-      'addressBook': addressBook.map((e) => e.toMap()).toList(),
     };
   }
 
@@ -315,7 +272,6 @@ class WalletStorageService {
       totalAccounts: dbStats['accounts'] ?? 0,
       totalTransactions: dbStats['transactions'] ?? 0,
       totalPreferences: dbStats['preferences'] ?? 0,
-      totalAddressBookEntries: dbStats['addressBook'] ?? 0,
       storedPrivateKeys: keyStats['privateKeys'] ?? 0,
       storedPublicKeys: keyStats['publicKeys'] ?? 0,
       storedMnemonics: keyStats['mnemonics'] ?? 0,
@@ -389,7 +345,6 @@ class WalletStatistics {
   final int totalAccounts;
   final int totalTransactions;
   final int totalPreferences;
-  final int totalAddressBookEntries;
   final int storedPrivateKeys;
   final int storedPublicKeys;
   final int storedMnemonics;
@@ -398,7 +353,6 @@ class WalletStatistics {
     required this.totalAccounts,
     required this.totalTransactions,
     required this.totalPreferences,
-    required this.totalAddressBookEntries,
     required this.storedPrivateKeys,
     required this.storedPublicKeys,
     required this.storedMnemonics,
@@ -418,48 +372,3 @@ class StorageHealthCheck {
 }
 
 // Extension methods for the existing models
-extension WalletAccountExtensions on WalletAccount {
-  WalletAccount copyWith({
-    int? id,
-    String? name,
-    String? address,
-    String? accountType,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-    bool? isActive,
-    Map<String, dynamic>? metadata,
-  }) {
-    return WalletAccount(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      address: address ?? this.address,
-      accountType: accountType ?? this.accountType,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
-      isActive: isActive ?? this.isActive,
-      metadata: metadata ?? this.metadata,
-    );
-  }
-}
-
-extension AddressBookEntryExtensions on AddressBookEntry {
-  AddressBookEntry copyWith({
-    int? id,
-    String? name,
-    String? address,
-    String? notes,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-    bool? isFavorite,
-  }) {
-    return AddressBookEntry(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      address: address ?? this.address,
-      notes: notes ?? this.notes,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
-      isFavorite: isFavorite ?? this.isFavorite,
-    );
-  }
-}

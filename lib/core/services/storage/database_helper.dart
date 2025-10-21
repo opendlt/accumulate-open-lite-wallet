@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart';
 // SQLite database helper for local wallet storage
+import 'package:accumulate_lite_wallet/core/models/accumulate_requests.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
-import '../../models/local_storage_models.dart';
+import '../../models/local_storage_models.dart' hide TransactionRecord;
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -24,24 +26,112 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 7,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
   }
 
   Future<void> _onCreate(Database db, int version) async {
-    // Create wallet_accounts table
+    // Create wallet_accounts table (enhanced for Accumulate features)
     await db.execute('''
       CREATE TABLE wallet_accounts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         address TEXT NOT NULL UNIQUE,
         account_type TEXT NOT NULL,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        parent_identity_id INTEGER,
+        token_url TEXT,
+        key_book_id INTEGER,
+        key_page_id INTEGER,
+        metadata TEXT
+      )
+    ''');
+
+    // Create identities table (ADI management)
+    await db.execute('''
+      CREATE TABLE identities (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        url TEXT NOT NULL UNIQUE,
+        key_book_count INTEGER DEFAULT 1,
+        account_count INTEGER DEFAULT 0,
+        sponsor_address TEXT,
         is_active INTEGER NOT NULL DEFAULT 1,
         metadata TEXT
+      )
+    ''');
+
+    // Create key_books table
+    await db.execute('''
+      CREATE TABLE key_books (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        identity_id INTEGER,
+        name TEXT NOT NULL,
+        url TEXT NOT NULL UNIQUE,
+        public_key_hash TEXT,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        metadata TEXT,
+        FOREIGN KEY(identity_id) REFERENCES identities(id)
+      )
+    ''');
+
+    // Create key_pages table
+    await db.execute('''
+      CREATE TABLE key_pages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key_book_id INTEGER,
+        name TEXT NOT NULL,
+        url TEXT NOT NULL UNIQUE,
+        keys_required INTEGER DEFAULT 1,
+        keys_required_of INTEGER DEFAULT 1,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        metadata TEXT,
+        FOREIGN KEY(key_book_id) REFERENCES key_books(id)
+      )
+    ''');
+
+    // Create keys table
+    await db.execute('''
+      CREATE TABLE keys (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key_page_id INTEGER,
+        nickname TEXT NOT NULL,
+        public_key TEXT NOT NULL,
+        private_key_encrypted TEXT NOT NULL,
+        public_key_hash TEXT,
+        is_default INTEGER DEFAULT 0,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        metadata TEXT,
+        FOREIGN KEY(key_page_id) REFERENCES key_pages(id)
+      )
+    ''');
+
+    // Create custom_tokens table
+    await db.execute('''
+      CREATE TABLE custom_tokens (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        symbol TEXT NOT NULL,
+        url TEXT NOT NULL UNIQUE,
+        precision INTEGER DEFAULT 8,
+        creator_identity_id INTEGER,
+        metadata TEXT,
+        FOREIGN KEY(creator_identity_id) REFERENCES identities(id)
+      )
+    ''');
+
+    // Create data_accounts table
+    await db.execute('''
+      CREATE TABLE data_accounts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        url TEXT NOT NULL UNIQUE,
+        parent_identity_id INTEGER,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        metadata TEXT,
+        FOREIGN KEY(parent_identity_id) REFERENCES identities(id)
       )
     ''');
 
@@ -49,14 +139,15 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE transaction_records (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        tx_hash TEXT NOT NULL UNIQUE,
-        from_address TEXT NOT NULL,
-        to_address TEXT NOT NULL,
-        amount TEXT NOT NULL,
-        token_type TEXT NOT NULL,
-        transaction_type TEXT NOT NULL,
-        timestamp INTEGER NOT NULL,
-        status TEXT NOT NULL DEFAULT 'pending',
+        transaction_id TEXT NOT NULL UNIQUE,
+        type TEXT NOT NULL,
+        direction TEXT NOT NULL,
+        from_url TEXT,
+        to_url TEXT,
+        amount INTEGER,
+        token_url TEXT,
+        timestamp INTEGER,
+        status TEXT,
         memo TEXT,
         metadata TEXT
       )
@@ -73,16 +164,18 @@ class DatabaseHelper {
       )
     ''');
 
-    // Create address_book table
+
+    // Create data_entries table
     await db.execute('''
-      CREATE TABLE address_book (
+      CREATE TABLE data_entries (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        address TEXT NOT NULL,
-        notes TEXT,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL,
-        is_favorite INTEGER NOT NULL DEFAULT 0
+        entry_hash TEXT,
+        data_account_url TEXT NOT NULL,
+        data TEXT NOT NULL,
+        timestamp INTEGER,
+        transaction_id TEXT,
+        is_state INTEGER DEFAULT 0,
+        metadata TEXT
       )
     ''');
 
@@ -111,14 +204,33 @@ class DatabaseHelper {
     // Create indexes for better performance
     await db.execute('CREATE INDEX idx_accounts_address ON wallet_accounts(address)');
     await db.execute('CREATE INDEX idx_accounts_type ON wallet_accounts(account_type)');
-    await db.execute('CREATE INDEX idx_transactions_hash ON transaction_records(tx_hash)');
-    await db.execute('CREATE INDEX idx_transactions_from ON transaction_records(from_address)');
-    await db.execute('CREATE INDEX idx_transactions_to ON transaction_records(to_address)');
+    await db.execute('CREATE INDEX idx_accounts_parent_identity ON wallet_accounts(parent_identity_id)');
+    await db.execute('CREATE INDEX idx_transactions_id ON transaction_records(transaction_id)');
+    await db.execute('CREATE INDEX idx_transactions_from ON transaction_records(from_url)');
+    await db.execute('CREATE INDEX idx_transactions_to ON transaction_records(to_url)');
+    await db.execute('CREATE INDEX idx_transactions_type ON transaction_records(type)');
+    await db.execute('CREATE INDEX idx_transactions_direction ON transaction_records(direction)');
     await db.execute('CREATE INDEX idx_transactions_timestamp ON transaction_records(timestamp)');
     await db.execute('CREATE INDEX idx_preferences_key ON user_preferences(key)');
-    await db.execute('CREATE INDEX idx_addressbook_address ON address_book(address)');
     await db.execute('CREATE INDEX idx_price_data_date ON price_data(date)');
     await db.execute('CREATE INDEX idx_account_balances_address ON account_balances(account_address)');
+
+    // Indexes for new Accumulate tables
+    await db.execute('CREATE INDEX idx_identities_name ON identities(name)');
+    await db.execute('CREATE INDEX idx_identities_url ON identities(url)');
+    await db.execute('CREATE INDEX idx_keybooks_identity ON key_books(identity_id)');
+    await db.execute('CREATE INDEX idx_keybooks_url ON key_books(url)');
+    await db.execute('CREATE INDEX idx_keypages_keybook ON key_pages(key_book_id)');
+    await db.execute('CREATE INDEX idx_keypages_url ON key_pages(url)');
+    await db.execute('CREATE INDEX idx_keys_keypage ON keys(key_page_id)');
+    await db.execute('CREATE INDEX idx_keys_public_key_hash ON keys(public_key_hash)');
+    await db.execute('CREATE INDEX idx_custom_tokens_url ON custom_tokens(url)');
+    await db.execute('CREATE INDEX idx_custom_tokens_creator ON custom_tokens(creator_identity_id)');
+    await db.execute('CREATE INDEX idx_data_accounts_parent ON data_accounts(parent_identity_id)');
+    await db.execute('CREATE INDEX idx_data_accounts_url ON data_accounts(url)');
+    await db.execute('CREATE INDEX idx_data_entries_account ON data_entries(data_account_url)');
+    await db.execute('CREATE INDEX idx_data_entries_hash ON data_entries(entry_hash)');
+    await db.execute('CREATE INDEX idx_data_entries_timestamp ON data_entries(timestamp)');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -148,6 +260,245 @@ class DatabaseHelper {
       await db.execute('CREATE INDEX idx_price_data_date ON price_data(date)');
       await db.execute('CREATE INDEX idx_account_balances_address ON account_balances(account_address)');
     }
+
+    if (oldVersion < 3) {
+      // Add Accumulate features in version 3
+
+      // Add new columns to wallet_accounts
+      await db.execute('ALTER TABLE wallet_accounts ADD COLUMN parent_identity_id INTEGER');
+      await db.execute('ALTER TABLE wallet_accounts ADD COLUMN token_url TEXT');
+      await db.execute('ALTER TABLE wallet_accounts ADD COLUMN key_book_id INTEGER');
+      await db.execute('ALTER TABLE wallet_accounts ADD COLUMN key_page_id INTEGER');
+
+      // Create identities table
+      await db.execute('''
+        CREATE TABLE identities (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL UNIQUE,
+          url TEXT NOT NULL UNIQUE,
+          key_book_count INTEGER DEFAULT 1,
+          account_count INTEGER DEFAULT 0,
+          sponsor_address TEXT,
+          is_active INTEGER NOT NULL DEFAULT 1,
+          metadata TEXT
+        )
+      ''');
+
+      // Create key_books table
+      await db.execute('''
+        CREATE TABLE key_books (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          identity_id INTEGER,
+          name TEXT NOT NULL,
+          url TEXT NOT NULL UNIQUE,
+          public_key_hash TEXT,
+          is_active INTEGER NOT NULL DEFAULT 1,
+          metadata TEXT,
+          FOREIGN KEY(identity_id) REFERENCES identities(id)
+        )
+      ''');
+
+      // Create key_pages table
+      await db.execute('''
+        CREATE TABLE key_pages (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          key_book_id INTEGER,
+          name TEXT NOT NULL,
+          url TEXT NOT NULL UNIQUE,
+          keys_required INTEGER DEFAULT 1,
+          keys_required_of INTEGER DEFAULT 1,
+          is_active INTEGER NOT NULL DEFAULT 1,
+          metadata TEXT,
+          FOREIGN KEY(key_book_id) REFERENCES key_books(id)
+        )
+      ''');
+
+      // Create keys table
+      await db.execute('''
+        CREATE TABLE keys (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          key_page_id INTEGER,
+          nickname TEXT NOT NULL,
+          public_key TEXT NOT NULL,
+          private_key_encrypted TEXT NOT NULL,
+          public_key_hash TEXT,
+          is_default INTEGER DEFAULT 0,
+          is_active INTEGER NOT NULL DEFAULT 1,
+          metadata TEXT,
+          FOREIGN KEY(key_page_id) REFERENCES key_pages(id)
+        )
+      ''');
+
+      // Create custom_tokens table
+      await db.execute('''
+        CREATE TABLE custom_tokens (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          symbol TEXT NOT NULL,
+          url TEXT NOT NULL UNIQUE,
+          precision INTEGER DEFAULT 8,
+          creator_identity_id INTEGER,
+          metadata TEXT,
+          FOREIGN KEY(creator_identity_id) REFERENCES identities(id)
+        )
+      ''');
+
+      // Create data_accounts table
+      await db.execute('''
+        CREATE TABLE data_accounts (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          url TEXT NOT NULL UNIQUE,
+          parent_identity_id INTEGER,
+          is_active INTEGER NOT NULL DEFAULT 1,
+          metadata TEXT,
+          FOREIGN KEY(parent_identity_id) REFERENCES identities(id)
+        )
+      ''');
+
+      // Create new indexes
+      await db.execute('CREATE INDEX idx_accounts_parent_identity ON wallet_accounts(parent_identity_id)');
+      await db.execute('CREATE INDEX idx_identities_name ON identities(name)');
+      await db.execute('CREATE INDEX idx_identities_url ON identities(url)');
+      await db.execute('CREATE INDEX idx_keybooks_identity ON key_books(identity_id)');
+      await db.execute('CREATE INDEX idx_keybooks_url ON key_books(url)');
+      await db.execute('CREATE INDEX idx_keypages_keybook ON key_pages(key_book_id)');
+      await db.execute('CREATE INDEX idx_keypages_url ON key_pages(url)');
+      await db.execute('CREATE INDEX idx_keys_keypage ON keys(key_page_id)');
+      await db.execute('CREATE INDEX idx_keys_public_key_hash ON keys(public_key_hash)');
+      await db.execute('CREATE INDEX idx_custom_tokens_url ON custom_tokens(url)');
+      await db.execute('CREATE INDEX idx_custom_tokens_creator ON custom_tokens(creator_identity_id)');
+      await db.execute('CREATE INDEX idx_data_accounts_parent ON data_accounts(parent_identity_id)');
+      await db.execute('CREATE INDEX idx_data_accounts_url ON data_accounts(url)');
+    }
+
+    if (oldVersion < 4) {
+      // Update transaction records schema for Send/Receive operations
+
+      // Drop existing transaction_records table and recreate with new schema
+      await db.execute('DROP TABLE IF EXISTS transaction_records');
+
+      // Create new transaction_records table
+      await db.execute('''
+        CREATE TABLE transaction_records (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          transaction_id TEXT NOT NULL UNIQUE,
+          type TEXT NOT NULL,
+          direction TEXT NOT NULL,
+          from_url TEXT,
+          to_url TEXT,
+          amount INTEGER,
+          token_url TEXT,
+          timestamp INTEGER,
+          status TEXT,
+          memo TEXT,
+          metadata TEXT
+        )
+      ''');
+
+      // Create indexes for new transaction table
+      await db.execute('CREATE INDEX idx_transactions_id ON transaction_records(transaction_id)');
+      await db.execute('CREATE INDEX idx_transactions_from ON transaction_records(from_url)');
+      await db.execute('CREATE INDEX idx_transactions_to ON transaction_records(to_url)');
+      await db.execute('CREATE INDEX idx_transactions_type ON transaction_records(type)');
+      await db.execute('CREATE INDEX idx_transactions_direction ON transaction_records(direction)');
+      await db.execute('CREATE INDEX idx_transactions_timestamp ON transaction_records(timestamp)');
+    }
+
+    if (oldVersion < 5) {
+      // Add data entries support for Data screen operations
+
+      // Create data_entries table
+      await db.execute('''
+        CREATE TABLE data_entries (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          entry_hash TEXT,
+          data_account_url TEXT NOT NULL,
+          data TEXT NOT NULL,
+          timestamp INTEGER,
+          transaction_id TEXT,
+          is_state INTEGER DEFAULT 0,
+          metadata TEXT
+        )
+      ''');
+
+      // Create indexes for data entries table
+      await db.execute('CREATE INDEX idx_data_entries_account ON data_entries(data_account_url)');
+      await db.execute('CREATE INDEX idx_data_entries_hash ON data_entries(entry_hash)');
+      await db.execute('CREATE INDEX idx_data_entries_timestamp ON data_entries(timestamp)');
+    }
+
+    if (oldVersion < 6) {
+      // Fix wallet_accounts table to remove created_at/updated_at constraints
+      // SQLite doesn't support DROP COLUMN, so we need to recreate the table
+
+      // Create new table without timestamp columns
+      await db.execute('''
+        CREATE TABLE wallet_accounts_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          address TEXT NOT NULL UNIQUE,
+          account_type TEXT NOT NULL,
+          is_active INTEGER NOT NULL DEFAULT 1,
+          parent_identity_id INTEGER,
+          token_url TEXT,
+          key_book_id INTEGER,
+          key_page_id INTEGER,
+          metadata TEXT
+        )
+      ''');
+
+      // Copy existing data (excluding timestamp columns)
+      await db.execute('''
+        INSERT INTO wallet_accounts_new (id, name, address, account_type, is_active, parent_identity_id, token_url, key_book_id, key_page_id, metadata)
+        SELECT id, name, address, account_type, is_active, parent_identity_id, token_url, key_book_id, key_page_id, metadata
+        FROM wallet_accounts
+      ''');
+
+      // Drop old table and rename new table
+      await db.execute('DROP TABLE wallet_accounts');
+      await db.execute('ALTER TABLE wallet_accounts_new RENAME TO wallet_accounts');
+
+      // Recreate indexes for wallet_accounts
+      await db.execute('CREATE INDEX idx_accounts_address ON wallet_accounts(address)');
+      await db.execute('CREATE INDEX idx_accounts_type ON wallet_accounts(account_type)');
+      await db.execute('CREATE INDEX idx_accounts_parent_identity ON wallet_accounts(parent_identity_id)');
+    }
+
+    if (oldVersion < 7) {
+      // Fix custom_tokens table to remove any created_at/updated_at constraints
+      // that might exist from older database versions
+
+      // Create new custom_tokens table with correct schema
+      await db.execute('''
+        CREATE TABLE custom_tokens_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          symbol TEXT NOT NULL,
+          url TEXT NOT NULL UNIQUE,
+          precision INTEGER DEFAULT 8,
+          creator_identity_id INTEGER,
+          metadata TEXT,
+          FOREIGN KEY(creator_identity_id) REFERENCES identities(id)
+        )
+      ''');
+
+      // Copy existing data (excluding any timestamp columns)
+      await db.execute('''
+        INSERT INTO custom_tokens_new (id, name, symbol, url, precision, creator_identity_id, metadata)
+        SELECT id, name, symbol, url, precision, creator_identity_id, metadata
+        FROM custom_tokens
+        WHERE 1=1
+      ''');
+
+      // Drop old table and rename new table
+      await db.execute('DROP TABLE custom_tokens');
+      await db.execute('ALTER TABLE custom_tokens_new RENAME TO custom_tokens');
+
+      // Recreate indexes for custom_tokens
+      await db.execute('CREATE INDEX idx_custom_tokens_url ON custom_tokens(url)');
+      await db.execute('CREATE INDEX idx_custom_tokens_creator ON custom_tokens(creator_identity_id)');
+    }
   }
 
   // ===== WALLET ACCOUNTS METHODS =====
@@ -163,7 +514,7 @@ class DatabaseHelper {
       'wallet_accounts',
       where: 'is_active = ?',
       whereArgs: [1],
-      orderBy: 'created_at DESC',
+      orderBy: 'id DESC',
     );
     return List.generate(maps.length, (i) => WalletAccount.fromMap(maps[i]));
   }
@@ -188,7 +539,7 @@ class DatabaseHelper {
       'wallet_accounts',
       where: 'account_type = ? AND is_active = ?',
       whereArgs: [accountType, 1],
-      orderBy: 'created_at DESC',
+      orderBy: 'id DESC',
     );
     return List.generate(maps.length, (i) => WalletAccount.fromMap(maps[i]));
   }
@@ -207,7 +558,7 @@ class DatabaseHelper {
     final db = await database;
     return await db.update(
       'wallet_accounts',
-      {'is_active': 0, 'updated_at': DateTime.now().millisecondsSinceEpoch},
+      {'is_active': 0},
       where: 'id = ?',
       whereArgs: [accountId],
     );
@@ -230,7 +581,7 @@ class DatabaseHelper {
     List<dynamic> whereArgs = [];
 
     if (address != null) {
-      query += ' WHERE from_address = ? OR to_address = ?';
+      query += ' WHERE from_url = ? OR to_url = ?';
       whereArgs = [address, address];
     }
 
@@ -241,12 +592,12 @@ class DatabaseHelper {
     return List.generate(maps.length, (i) => TransactionRecord.fromMap(maps[i]));
   }
 
-  Future<TransactionRecord?> getTransactionByHash(String txHash) async {
+  Future<TransactionRecord?> getTransactionById(String transactionId) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'transaction_records',
-      where: 'tx_hash = ?',
-      whereArgs: [txHash],
+      where: 'transaction_id = ?',
+      whereArgs: [transactionId],
       limit: 1,
     );
     if (maps.isNotEmpty) {
@@ -255,13 +606,13 @@ class DatabaseHelper {
     return null;
   }
 
-  Future<int> updateTransactionStatus(String txHash, String status) async {
+  Future<int> updateTransactionStatus(String transactionId, String status) async {
     final db = await database;
     return await db.update(
       'transaction_records',
       {'status': status},
-      where: 'tx_hash = ?',
-      whereArgs: [txHash],
+      where: 'transaction_id = ?',
+      whereArgs: [transactionId],
     );
   }
 
@@ -351,51 +702,6 @@ class DatabaseHelper {
     return preferences;
   }
 
-  // ===== ADDRESS BOOK METHODS =====
-
-  Future<int> insertAddressBookEntry(AddressBookEntry entry) async {
-    final db = await database;
-    return await db.insert('address_book', entry.toMap());
-  }
-
-  Future<List<AddressBookEntry>> getAddressBook() async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'address_book',
-      orderBy: 'name ASC',
-    );
-    return List.generate(maps.length, (i) => AddressBookEntry.fromMap(maps[i]));
-  }
-
-  Future<List<AddressBookEntry>> getFavoriteAddresses() async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'address_book',
-      where: 'is_favorite = ?',
-      whereArgs: [1],
-      orderBy: 'name ASC',
-    );
-    return List.generate(maps.length, (i) => AddressBookEntry.fromMap(maps[i]));
-  }
-
-  Future<int> updateAddressBookEntry(AddressBookEntry entry) async {
-    final db = await database;
-    return await db.update(
-      'address_book',
-      entry.toMap(),
-      where: 'id = ?',
-      whereArgs: [entry.id],
-    );
-  }
-
-  Future<int> deleteAddressBookEntry(int entryId) async {
-    final db = await database;
-    return await db.delete(
-      'address_book',
-      where: 'id = ?',
-      whereArgs: [entryId],
-    );
-  }
 
   // ===== UTILITY METHODS =====
 
@@ -405,7 +711,6 @@ class DatabaseHelper {
       await txn.delete('wallet_accounts');
       await txn.delete('transaction_records');
       await txn.delete('user_preferences');
-      await txn.delete('address_book');
       await txn.delete('price_data');
       await txn.delete('account_balances');
     });
@@ -437,6 +742,26 @@ class DatabaseHelper {
     return List.generate(maps.length, (i) => PriceData.fromMap(maps[i]));
   }
 
+  /// Get the latest ACME price for USD calculations
+  Future<double> getLatestAcmePrice() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'price_data',
+      where: 'token_symbol = ?',
+      whereArgs: ['ACME'],
+      orderBy: 'date DESC',
+      limit: 1,
+    );
+
+    if (maps.isNotEmpty) {
+      final priceData = PriceData.fromMap(maps.first);
+      return priceData.price;
+    }
+
+    // Fallback to a default price if no data
+    return 0.25; // Default ACME price
+  }
+
   /// Insert or update account balance for pie chart
   Future<int> insertOrUpdateAccountBalance(AccountBalance accountBalance) async {
     final db = await database;
@@ -449,16 +774,32 @@ class DatabaseHelper {
     );
 
     if (existing.isNotEmpty) {
-      // Update existing
+      // Update existing - exclude ID field to avoid datatype mismatch
+      final updateMap = {
+        'account_address': accountBalance.accountAddress,
+        'account_name': accountBalance.accountName,
+        'acme_balance': accountBalance.acmeBalance,
+        'account_type': accountBalance.accountType,
+        'updated_at': accountBalance.updatedAt.millisecondsSinceEpoch,
+      };
+
       return await db.update(
         'account_balances',
-        accountBalance.toMap(),
+        updateMap,
         where: 'account_address = ?',
         whereArgs: [accountBalance.accountAddress],
       );
     } else {
-      // Insert new
-      return await db.insert('account_balances', accountBalance.toMap());
+      // Insert new - exclude ID field since it's auto-increment
+      final insertMap = {
+        'account_address': accountBalance.accountAddress,
+        'account_name': accountBalance.accountName,
+        'acme_balance': accountBalance.acmeBalance,
+        'account_type': accountBalance.accountType,
+        'updated_at': accountBalance.updatedAt.millisecondsSinceEpoch,
+      };
+
+      return await db.insert('account_balances', insertMap);
     }
   }
 
@@ -545,7 +886,6 @@ class DatabaseHelper {
     final accounts = await db.rawQuery('SELECT COUNT(*) as count FROM wallet_accounts WHERE is_active = 1');
     final transactions = await db.rawQuery('SELECT COUNT(*) as count FROM transaction_records');
     final preferences = await db.rawQuery('SELECT COUNT(*) as count FROM user_preferences');
-    final addressBook = await db.rawQuery('SELECT COUNT(*) as count FROM address_book');
     final priceData = await db.rawQuery('SELECT COUNT(*) as count FROM price_data');
     final accountBalances = await db.rawQuery('SELECT COUNT(*) as count FROM account_balances');
 
@@ -553,9 +893,251 @@ class DatabaseHelper {
       'accounts': accounts.first['count'] as int,
       'transactions': transactions.first['count'] as int,
       'preferences': preferences.first['count'] as int,
-      'addressBook': addressBook.first['count'] as int,
       'priceData': priceData.first['count'] as int,
       'accountBalances': accountBalances.first['count'] as int,
+    };
+  }
+
+  // ===== ACCUMULATE ENTITIES METHODS =====
+
+  /// Insert identity
+  Future<int> insertIdentity(AccumulateIdentity identity) async {
+    final db = await database;
+    return await db.insert('identities', identity.toMap());
+  }
+
+  /// Get all identities
+  Future<List<AccumulateIdentity>> getAllIdentities() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'identities',
+      where: 'is_active = ?',
+      whereArgs: [1],
+      orderBy: 'id DESC',
+    );
+    return List.generate(maps.length, (i) => AccumulateIdentity.fromMap(maps[i]));
+  }
+
+  /// Insert key book
+  Future<int> insertKeyBook(AccumulateKeyBook keyBook) async {
+    final db = await database;
+    return await db.insert('key_books', keyBook.toMap());
+  }
+
+  /// Get key books by identity
+  Future<List<AccumulateKeyBook>> getKeyBooksByIdentity(int identityId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'key_books',
+      where: 'identity_id = ? AND is_active = ?',
+      whereArgs: [identityId, 1],
+      orderBy: 'id ASC',
+    );
+    return List.generate(maps.length, (i) => AccumulateKeyBook.fromMap(maps[i]));
+  }
+
+  /// Insert key page
+  Future<int> insertKeyPage(AccumulateKeyPage keyPage) async {
+    final db = await database;
+    return await db.insert('key_pages', keyPage.toMap());
+  }
+
+  /// Get key pages by key book
+  Future<List<AccumulateKeyPage>> getKeyPagesByKeyBook(int keyBookId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'key_pages',
+      where: 'key_book_id = ? AND is_active = ?',
+      whereArgs: [keyBookId, 1],
+      orderBy: 'id ASC',
+    );
+    return List.generate(maps.length, (i) => AccumulateKeyPage.fromMap(maps[i]));
+  }
+
+  /// Insert key
+  Future<int> insertKey(AccumulateKey key) async {
+    final db = await database;
+    return await db.insert('keys', key.toMap());
+  }
+
+  /// Get keys by key page
+  Future<List<AccumulateKey>> getKeysByKeyPage(int keyPageId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'keys',
+      where: 'key_page_id = ? AND is_active = ?',
+      whereArgs: [keyPageId, 1],
+      orderBy: 'is_default DESC, id ASC',
+    );
+    return List.generate(maps.length, (i) => AccumulateKey.fromMap(maps[i]));
+  }
+
+  /// Insert custom token
+  Future<int> insertCustomToken(AccumulateCustomToken token) async {
+    final db = await database;
+    return await db.insert('custom_tokens', token.toMap());
+  }
+
+  /// Get all custom tokens
+  Future<List<AccumulateCustomToken>> getAllCustomTokens() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'custom_tokens',
+      orderBy: 'id DESC',
+    );
+    return List.generate(maps.length, (i) => AccumulateCustomToken.fromMap(maps[i]));
+  }
+
+  /// Insert data account
+  Future<int> insertDataAccount(AccumulateDataAccount dataAccount) async {
+    final db = await database;
+    return await db.insert('data_accounts', dataAccount.toMap());
+  }
+
+  /// Get all data accounts
+  Future<List<AccumulateDataAccount>> getAllDataAccounts() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'data_accounts',
+      where: 'is_active = ?',
+      whereArgs: [1],
+      orderBy: 'id DESC',
+    );
+    return List.generate(maps.length, (i) => AccumulateDataAccount.fromMap(maps[i]));
+  }
+
+  // ===== DATA ENTRIES METHODS =====
+
+  /// Insert data entry
+  Future<int> insertDataEntry(DataEntry dataEntry) async {
+    final db = await database;
+    return await db.insert('data_entries', dataEntry.toMap());
+  }
+
+  /// Get data entries by data account URL
+  Future<List<DataEntry>> getDataEntriesByAccount({
+    required String dataAccountUrl,
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'data_entries',
+      where: 'data_account_url = ?',
+      whereArgs: [dataAccountUrl],
+      orderBy: 'timestamp DESC',
+      limit: limit,
+      offset: offset,
+    );
+    return maps.map((map) => DataEntry.fromMap(map)).toList();
+  }
+
+  /// Get data entry by hash
+  Future<DataEntry?> getDataEntryByHash(String entryHash) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'data_entries',
+      where: 'entry_hash = ?',
+      whereArgs: [entryHash],
+      limit: 1,
+    );
+    if (maps.isNotEmpty) {
+      return DataEntry.fromMap(maps.first);
+    }
+    return null;
+  }
+
+  /// Get recent data entries across all accounts
+  Future<List<DataEntry>> getRecentDataEntries({
+    int limit = 20,
+  }) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'data_entries',
+      orderBy: 'timestamp DESC',
+      limit: limit,
+    );
+    return maps.map((map) => DataEntry.fromMap(map)).toList();
+  }
+
+  /// Count data entries for an account
+  Future<int> getDataEntryCount(String dataAccountUrl) async {
+    final db = await database;
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM data_entries WHERE data_account_url = ?',
+      [dataAccountUrl],
+    );
+    return result.first['count'] as int;
+  }
+
+  /// Search data entries by content
+  Future<List<DataEntry>> searchDataEntries({
+    String? query,
+    String? dataAccountUrl,
+    int limit = 50,
+  }) async {
+    final db = await database;
+    String whereClause = '';
+    List<dynamic> whereArgs = [];
+
+    if (query != null && query.isNotEmpty) {
+      whereClause = 'data LIKE ?';
+      whereArgs.add('%$query%');
+    }
+
+    if (dataAccountUrl != null) {
+      if (whereClause.isNotEmpty) {
+        whereClause += ' AND ';
+      }
+      whereClause += 'data_account_url = ?';
+      whereArgs.add(dataAccountUrl);
+    }
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'data_entries',
+      where: whereClause.isNotEmpty ? whereClause : null,
+      whereArgs: whereArgs.isNotEmpty ? whereArgs : null,
+      orderBy: 'timestamp DESC',
+      limit: limit,
+    );
+    return maps.map((map) => DataEntry.fromMap(map)).toList();
+  }
+
+  /// Delete data entries for an account (soft delete by removing from local cache)
+  Future<int> deleteDataEntriesForAccount(String dataAccountUrl) async {
+    final db = await database;
+    return await db.delete(
+      'data_entries',
+      where: 'data_account_url = ?',
+      whereArgs: [dataAccountUrl],
+    );
+  }
+
+  /// Get data statistics
+  Future<Map<String, int>> getDataStats() async {
+    final db = await database;
+
+    final totalEntries = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM data_entries',
+    );
+
+    final stateEntries = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM data_entries WHERE is_state = 1',
+    );
+
+    final scratchEntries = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM data_entries WHERE is_state = 0',
+    );
+
+    final uniqueAccounts = await db.rawQuery(
+      'SELECT COUNT(DISTINCT data_account_url) as count FROM data_entries',
+    );
+
+    return {
+      'totalEntries': totalEntries.first['count'] as int,
+      'stateEntries': stateEntries.first['count'] as int,
+      'scratchEntries': scratchEntries.first['count'] as int,
+      'uniqueAccounts': uniqueAccounts.first['count'] as int,
     };
   }
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 // Core pending transaction service - no Flutter dependencies
 import '../blockchain/accumulate_api_service.dart';
 import '../../models/pending_transaction.dart';

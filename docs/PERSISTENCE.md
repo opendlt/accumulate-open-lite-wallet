@@ -1,27 +1,61 @@
-# Data Persistence Implementation Guide
+# Data Persistence Extension Guide
 
-This guide shows how to implement data persistence for your Accumulate wallet. The core wallet includes no local database - you choose your storage solution.
+This guide shows how to extend the existing data persistence in your Accumulate wallet. The core wallet already includes SQLite database and Flutter Secure Storage.
 
-## Overview
+## Current Implementation
 
-You need to implement persistent storage for:
-- User preferences and settings
-- Transaction history and cache
-- Account balances and data
-- Application state
-- Offline data access
+The wallet already includes persistent storage for:
+- User accounts and wallet data (SQLite + DatabaseHelper)
+- Transaction history and records (SQLite database)
+- Secure key storage (Flutter Secure Storage)
+- Application preferences (SQLite database)
+- Identity and account management (SQLite database)
 
-## Storage Options
+## Current Database Schema
 
-### Option 1: SQLite (Recommended for Full Features)
+The app uses SQLite with the following tables:
 
-**Best for:** Transaction history, complex queries, offline functionality
+### Core Tables
+- `wallet_accounts` - Account information and metadata
+- `identities` - Accumulate Digital Identifiers (ADIs)
+- `key_books` - Key management hierarchy
+- `key_pages` - Key page definitions
+- `keys` - Cryptographic keys (encrypted)
+- `custom_tokens` - Custom token definitions
+- `data_accounts` - Data account storage
+- `transaction_records` - Transaction history
+- `data_entries` - Data entries for accounts
+- `price_data` - Price information for charts
+- `account_balances` - Balance tracking
+- `user_preferences` - Application settings
+
+### Secure Storage
+- Private keys (Flutter Secure Storage)
+- Mnemonics and seeds (Flutter Secure Storage)
+- Authentication tokens (Flutter Secure Storage)
+
+## Extension Options
+
+You can extend the existing storage with:
+- Cloud backup integration
+- Remote database synchronization
+- Additional custom data models
+- Enhanced encryption layers
+- Cross-device data sync
+- Export/import functionality
+
+## Current Implementation Details
+
+### SQLite Database (Already Implemented)
+
+**Already included:** Transaction history, complex queries, offline functionality
 
 ```yaml
-# pubspec.yaml
+# Already in pubspec.yaml:
 dependencies:
   sqflite: ^2.4.1
   path: ^1.9.0
+  flutter_secure_storage: ^9.2.2
 ```
 
 #### Implementation

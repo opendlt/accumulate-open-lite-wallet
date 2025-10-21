@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 // Example of how to use the new core architecture
 // This demonstrates the clean separation and testability of the core layer
 
@@ -40,19 +41,19 @@ class CoreUsageExample {
       'testuser@accu2.io',
     );
 
-    print('Generated identity: ${identity.username}');
+    debugPrint('Generated identity: ${identity.username}');
 
     // Retrieve stored identity
     final storedIdentity = await identityService.getStoredIdentity();
-    print('Retrieved identity: ${storedIdentity?.username}');
+    debugPrint('Retrieved identity: ${storedIdentity?.username}');
 
     // Create signer for transactions
     final signer = await identityService.createSigner();
-    print('Signer available: ${signer != null}');
+    debugPrint('Signer available: ${signer != null}');
 
     // Validate integrity
     final isValid = await identityService.validateStoredIdentity();
-    print('Identity valid: $isValid');
+    debugPrint('Identity valid: $isValid');
   }
 
   static Future<void> _demonstratePendingTransactions() async {
@@ -72,17 +73,17 @@ class CoreUsageExample {
       userSignerUrl: 'acc://testuser.acme/book/1',
     );
 
-    print('Total pending transactions: ${response.count}');
-    print('Paths with pending: ${response.bySigningPath.length}');
+    debugPrint('Total pending transactions: ${response.count}');
+    debugPrint('Paths with pending: ${response.bySigningPath.length}');
 
     // Flatten for UI display
     final flatList = pendingTxService.flatten(response);
-    print('Flat list size: ${flatList.length}');
+    debugPrint('Flat list size: ${flatList.length}');
 
     // Check if user has any pending
     final hasPending =
         await pendingTxService.hasPendingTransactions(signingPaths);
-    print('Has pending transactions: $hasPending');
+    debugPrint('Has pending transactions: $hasPending');
   }
 
   static Future<void> _demonstrateUserRepository() async {
@@ -99,20 +100,20 @@ class CoreUsageExample {
     );
 
     await userRepo.saveUser(user);
-    print('User saved');
+    debugPrint('User saved');
 
     // Load user data
     final loadedUser = await userRepo.loadUser();
-    print('Loaded user: ${loadedUser?.username}');
+    debugPrint('Loaded user: ${loadedUser?.username}');
 
     // Check if user exists
     final hasUser = await userRepo.hasUser();
-    print('User exists: $hasUser');
+    debugPrint('User exists: $hasUser');
 
     // Manage settings
     await userRepo.saveUserSettings({'addTxMemosEnabled': true});
     final settings = await userRepo.getUserSettings();
-    print('Settings: $settings');
+    debugPrint('Settings: $settings');
   }
 }
 

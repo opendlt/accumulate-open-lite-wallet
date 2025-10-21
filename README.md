@@ -2,9 +2,9 @@
 
 A stripped-down, open-source foundation for building Accumulate blockchain wallets. This project provides the essential UI components, business logic, and blockchain integration needed to create a functional Accumulate wallet.
 
-## 🎯 What's Included
+## What's Included
 
-### ✅ Core Wallet Features
+### Core Wallet Features
 - **Dashboard UI** - Balance display, transaction history, charts
 - **Transaction Management** - Send/receive tokens, staking interfaces
 - **Multi-Signature Support** - Complete signing workflow and delegation
@@ -12,27 +12,29 @@ A stripped-down, open-source foundation for building Accumulate blockchain walle
 - **QR Code Integration** - Address scanning and generation
 - **Accumulate API** - Full blockchain integration
 - **Cryptographic Utilities** - Key management and signing
+- **Local Data Persistence** - SQLite database for transaction history and accounts
+- **Secure Storage** - Flutter Secure Storage for sensitive data
 
-### ✅ Clean Architecture
+### Clean Architecture
 - **Pure Dart Business Logic** - No Flutter dependencies in core
 - **Provider State Management** - Reactive UI updates
 - **Service Locator Pattern** - Dependency injection
 - **Modular Feature Structure** - Easy to extend and maintain
 
-## ❌ What's NOT Included (You Need to Implement)
+## What's NOT Included (You Need to Implement)
 
 - **User Authentication** - No login/registration system
-- **Data Persistence** - No local database or storage
 - **Background Services** - No automatic polling or sync
 - **Push Notifications** - No FCM or notification system
 - **User Onboarding** - No account creation flow
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - Flutter 3.3.1 or higher
 - Dart SDK
 - Git
+- Docker (for DevNet setup)
 
 ### Installation
 
@@ -43,9 +45,48 @@ flutter pub get
 flutter run
 ```
 
+## DevNet Setup (Required for Development)
+
+This wallet is configured to work with Accumulate DevNet running on `localhost:26660`. For development and testing, you'll need to set up a local DevNet instance.
+
+### Using Accumulate DevNet Distribution
+
+1. **Clone the DevNet distribution:**
+   ```bash
+   git clone https://github.com/opendlt/accumulate-devnet-distribution.git
+   cd accumulate-devnet-distribution
+   ```
+
+2. **Start the DevNet:**
+   ```bash
+   # Follow the instructions in the repository to start DevNet
+   # This will start Accumulate nodes on localhost:26660
+   ```
+
+3. **Verify DevNet is running:**
+   ```bash
+   # Test that the API is accessible
+   curl http://localhost:26660/v2
+   ```
+
+4. **Run the wallet:**
+   ```bash
+   # In your wallet project directory
+   flutter run
+   ```
+
+### Network Configuration
+
+The wallet is pre-configured for DevNet with:
+- **API Endpoint**: `http://10.0.2.2:26660/v2` (Android emulator endpoint)
+- **Network Type**: DevNet
+- **Faucet**: Built-in faucet integration for test tokens
+
+For production deployment, update `lib/core/constants/app_constants.dart` with appropriate network endpoints.
+
 The app will launch with a placeholder authentication screen showing what needs to be implemented.
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 lib/
@@ -68,7 +109,7 @@ lib/
 └── main.dart              # App entry point
 ```
 
-## 🛠 Implementation Guide
+## Implementation Guide
 
 ### 1. Authentication (Required)
 Implement user authentication and identity management:
@@ -83,18 +124,18 @@ Implement user authentication and identity management:
 
 **See: [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md)**
 
-### 2. Data Persistence (Required)
-Choose and implement a storage solution:
+### 2. Extend Data Storage (Optional)
+The wallet includes SQLite database and secure storage. You can extend with:
 
 ```dart
-// Options:
-- SQLite (sqflite)
-- Hive
-- Shared Preferences
-- Remote database
+// Additional options:
+- Cloud backup integration
+- Remote database sync
+- Additional data models
+- Custom encryption layers
 ```
 
-**See: [docs/PERSISTENCE.md](docs/PERSISTENCE.md)**
+**See: [docs/PERSISTENCE.md](docs/PERSISTENCE.md) for extension patterns**
 
 ### 3. Configuration (Required)
 Set up your environment and endpoints:
@@ -121,7 +162,7 @@ Extend with additional features:
 
 **See: [docs/SERVICES.md](docs/SERVICES.md)**
 
-## 🏗 Architecture Overview
+## Architecture Overview
 
 This wallet uses a clean architecture pattern:
 
@@ -132,9 +173,12 @@ This wallet uses a clean architecture pattern:
 ### Key Services
 
 - `AccumulateApiService` - Blockchain API integration
-- `TokenSenderService` - Transaction submission
-- `SignatureCountService` - Multi-sig management
-- `CoreIdentityService` - Identity and key management
+- `EnhancedAccumulateService` - Advanced blockchain operations
+- `DatabaseHelper` - SQLite database management
+- `SecureKeysService` - Secure storage for sensitive data
+- `WalletStorageService` - Account and wallet persistence
+- `TransactionSigningService` - Transaction signing and submission
+- `ServiceLocator` - Dependency injection management
 
 ### State Management
 
@@ -143,7 +187,7 @@ Uses Provider pattern for reactive state:
 - `TransactionsProvider` - Transaction management
 - `PendingTxProvider` - Pending transaction tracking
 
-## 🔧 Customization
+## Customization
 
 ### Theming
 Modify `lib/shared/themes/app_theme.dart` to customize appearance.
@@ -154,14 +198,14 @@ Update `lib/config/app_config.dart` for different networks or endpoints.
 ### Feature Flags
 Use `lib/config/feature_flags.dart` to enable/disable features.
 
-## 📚 Documentation
+## Documentation
 
 - [Authentication Guide](docs/AUTHENTICATION.md) - Implement user auth
 - [Persistence Guide](docs/PERSISTENCE.md) - Add data storage
 - [Configuration Guide](docs/CONFIGURATION.md) - Environment setup
 - [Services Guide](docs/SERVICES.md) - Extend functionality
 
-## 🤝 Contributing
+## Contributing
 
 This is an open-source foundation. Feel free to:
 - Add missing implementations
@@ -169,14 +213,15 @@ This is an open-source foundation. Feel free to:
 - Submit bug fixes
 - Enhance documentation
 
-## 📄 License
+## License
 
 [Add your license here]
 
-## 🔗 Resources
+## Resources
 
 - [Accumulate Protocol](https://accumulate.io)
 - [Accumulate API Documentation](https://docs.accumulate.io)
+- [Accumulate DevNet Distribution](https://github.com/opendlt/accumulate-devnet-distribution) - Required for development
 - [Flutter Documentation](https://flutter.dev/docs)
 
 ---

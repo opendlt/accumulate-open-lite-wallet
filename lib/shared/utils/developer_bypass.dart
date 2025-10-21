@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 // Universal developer bypass helper for open-source wallet
 // Allows developers to bypass blocking screens and authentication
 import 'package:flutter/material.dart';
@@ -11,8 +12,13 @@ class DeveloperBypass {
   static Future<bool> isDeveloperModeEnabled() async {
     try {
       final value = await _storage.read(key: _devModeKey);
-      return value == 'true';
+      final isEnabled = value == 'true';
+      debugPrint('Developer Mode Check: $isEnabled (stored value: $value)');
+      // Developer mode is OFF by default - only true if explicitly set
+      return isEnabled;
     } catch (e) {
+      debugPrint('Developer Mode Check: false (error: $e)');
+      // Always return false if there's any error or no value stored
       return false;
     }
   }
@@ -150,7 +156,7 @@ class DeveloperBypass {
   /// Simulate successful authentication for developer mode
   static Future<bool> simulateAuth() async {
     if (await isDeveloperModeEnabled()) {
-      debugPrint('🔧 Developer mode: Simulating successful authentication');
+      debugPrint('Developer mode: Simulating successful authentication');
       return true;
     }
     return false;
@@ -162,7 +168,7 @@ class DeveloperBypass {
     Map<String, dynamic>? mockResponse,
   }) async {
     if (await isDeveloperModeEnabled()) {
-      debugPrint('🔧 Developer mode: Simulating network call to $endpoint');
+      debugPrint('Developer mode: Simulating network call to $endpoint');
       await Future.delayed(const Duration(milliseconds: 500)); // Simulate delay
       return mockResponse ?? {'success': true, 'data': 'mock_data'};
     }
@@ -172,7 +178,7 @@ class DeveloperBypass {
   /// Simulate successful balance check for developer mode
   static Future<String> simulateBalance() async {
     if (await isDeveloperModeEnabled()) {
-      debugPrint('🔧 Developer mode: Simulating account balance');
+      debugPrint('Developer mode: Simulating account balance');
       return '1000.50 ACME';
     }
     return '0.00 ACME';

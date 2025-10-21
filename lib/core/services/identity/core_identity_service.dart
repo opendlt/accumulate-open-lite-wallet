@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 // Core identity service - no Flutter dependencies
 import 'package:accumulate_api/accumulate_api.dart';
 import '../storage/secure_storage_interface.dart';

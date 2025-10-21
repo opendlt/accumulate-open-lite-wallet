@@ -1,36 +1,57 @@
 // Local storage models for SQLite database
+import 'dart:convert';
+
+/// Utility functions for metadata encoding/decoding
+String _encodeMetadata(Map<String, dynamic> metadata) {
+  return json.encode(metadata);
+}
+
+Map<String, dynamic> _decodeMetadata(String metadata) {
+  try {
+    return json.decode(metadata) as Map<String, dynamic>;
+  } catch (e) {
+    return {};
+  }
+}
 
 /// Account model for storing wallet accounts locally
 class WalletAccount {
   final int? id;
-  final String name;
-  final String address;
+  final String address; // Use address/URL as the primary identifier
   final String accountType; // 'lite_account', 'adi', 'token_account', 'data_account'
-  final DateTime createdAt;
-  final DateTime updatedAt;
   final bool isActive;
+  final int? parentIdentityId;
+  final String? tokenUrl;
+  final int? keyBookId;
+  final int? keyPageId;
   final Map<String, dynamic>? metadata;
 
   WalletAccount({
     this.id,
-    required this.name,
     required this.address,
     required this.accountType,
-    required this.createdAt,
-    required this.updatedAt,
     this.isActive = true,
+    this.parentIdentityId,
+    this.tokenUrl,
+    this.keyBookId,
+    this.keyPageId,
     this.metadata,
   });
+
+  /// Getter for display name - returns the address/URL
+  String get name => address;
 
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'name': name,
+      'name': address, // Use address as name for database compatibility
       'address': address,
       'account_type': accountType,
-      'created_at': createdAt.millisecondsSinceEpoch,
-      'updated_at': updatedAt.millisecondsSinceEpoch,
       'is_active': isActive ? 1 : 0,
+      'parent_identity_id': parentIdentityId,
+      'token_url': tokenUrl,
+      'key_book_id': keyBookId,
+      'key_page_id': keyPageId,
       'metadata': metadata != null ? _encodeMetadata(metadata!) : null,
     };
   }
@@ -38,46 +59,39 @@ class WalletAccount {
   factory WalletAccount.fromMap(Map<String, dynamic> map) {
     return WalletAccount(
       id: map['id'],
-      name: map['name'],
       address: map['address'],
       accountType: map['account_type'],
-      createdAt: DateTime.fromMillisecondsSinceEpoch(map['created_at']),
-      updatedAt: DateTime.fromMillisecondsSinceEpoch(map['updated_at']),
       isActive: map['is_active'] == 1,
+      parentIdentityId: map['parent_identity_id'],
+      tokenUrl: map['token_url'],
+      keyBookId: map['key_book_id'],
+      keyPageId: map['key_page_id'],
       metadata: map['metadata'] != null ? _decodeMetadata(map['metadata']) : null,
     );
   }
 
   WalletAccount copyWith({
     int? id,
-    String? name,
     String? address,
     String? accountType,
-    DateTime? createdAt,
-    DateTime? updatedAt,
     bool? isActive,
+    int? parentIdentityId,
+    String? tokenUrl,
+    int? keyBookId,
+    int? keyPageId,
     Map<String, dynamic>? metadata,
   }) {
     return WalletAccount(
       id: id ?? this.id,
-      name: name ?? this.name,
       address: address ?? this.address,
       accountType: accountType ?? this.accountType,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
       isActive: isActive ?? this.isActive,
+      parentIdentityId: parentIdentityId ?? this.parentIdentityId,
+      tokenUrl: tokenUrl ?? this.tokenUrl,
+      keyBookId: keyBookId ?? this.keyBookId,
+      keyPageId: keyPageId ?? this.keyPageId,
       metadata: metadata ?? this.metadata,
     );
-  }
-
-  static String _encodeMetadata(Map<String, dynamic> metadata) {
-    // Simple JSON encoding - in production use proper JSON encoder
-    return metadata.toString();
-  }
-
-  static Map<String, dynamic> _decodeMetadata(String metadata) {
-    // Simple JSON decoding - in production use proper JSON decoder
-    return {};
   }
 }
 
@@ -185,50 +199,6 @@ class UserPreferences {
   String get stringValue => value;
 }
 
-/// Address book entry model
-class AddressBookEntry {
-  final int? id;
-  final String name;
-  final String address;
-  final String? notes;
-  final DateTime createdAt;
-  final DateTime updatedAt;
-  final bool isFavorite;
-
-  AddressBookEntry({
-    this.id,
-    required this.name,
-    required this.address,
-    this.notes,
-    required this.createdAt,
-    required this.updatedAt,
-    this.isFavorite = false,
-  });
-
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'name': name,
-      'address': address,
-      'notes': notes,
-      'created_at': createdAt.millisecondsSinceEpoch,
-      'updated_at': updatedAt.millisecondsSinceEpoch,
-      'is_favorite': isFavorite ? 1 : 0,
-    };
-  }
-
-  factory AddressBookEntry.fromMap(Map<String, dynamic> map) {
-    return AddressBookEntry(
-      id: map['id'],
-      name: map['name'],
-      address: map['address'],
-      notes: map['notes'],
-      createdAt: DateTime.fromMillisecondsSinceEpoch(map['created_at']),
-      updatedAt: DateTime.fromMillisecondsSinceEpoch(map['updated_at']),
-      isFavorite: map['is_favorite'] == 1,
-    );
-  }
-}
 
 /// Price data for line chart
 class PriceData {
@@ -300,6 +270,288 @@ class AccountBalance {
       acmeBalance: map['acme_balance'].toDouble(),
       accountType: map['account_type'],
       updatedAt: DateTime.fromMillisecondsSinceEpoch(map['updated_at']),
+    );
+  }
+}
+
+/// Identity (ADI) model for Accumulate Digital Identifiers
+class AccumulateIdentity {
+  final int? id;
+  final String name;
+  final String url;
+  final int keyBookCount;
+  final int accountCount;
+  final String? sponsorAddress;
+  final bool isActive;
+  final Map<String, dynamic>? metadata;
+
+  AccumulateIdentity({
+    this.id,
+    required this.name,
+    required this.url,
+    this.keyBookCount = 1,
+    this.accountCount = 0,
+    this.sponsorAddress,
+    this.isActive = true,
+    this.metadata,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'url': url,
+      'key_book_count': keyBookCount,
+      'account_count': accountCount,
+      'sponsor_address': sponsorAddress,
+      'is_active': isActive ? 1 : 0,
+      'metadata': metadata != null ? _encodeMetadata(metadata!) : null,
+    };
+  }
+
+  factory AccumulateIdentity.fromMap(Map<String, dynamic> map) {
+    return AccumulateIdentity(
+      id: map['id'],
+      name: map['name'],
+      url: map['url'],
+      keyBookCount: map['key_book_count'] ?? 1,
+      accountCount: map['account_count'] ?? 0,
+      sponsorAddress: map['sponsor_address'],
+      isActive: map['is_active'] == 1,
+      metadata: map['metadata'] != null ? _decodeMetadata(map['metadata']) : null,
+    );
+  }
+}
+
+/// KeyBook model for key management hierarchy
+class AccumulateKeyBook {
+  final int? id;
+  final int identityId;
+  final String name;
+  final String url;
+  final String? publicKeyHash;
+  final bool isActive;
+  final Map<String, dynamic>? metadata;
+
+  AccumulateKeyBook({
+    this.id,
+    required this.identityId,
+    required this.name,
+    required this.url,
+    this.publicKeyHash,
+    this.isActive = true,
+    this.metadata,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'identity_id': identityId,
+      'name': name,
+      'url': url,
+      'public_key_hash': publicKeyHash,
+      'is_active': isActive ? 1 : 0,
+      'metadata': metadata != null ? _encodeMetadata(metadata!) : null,
+    };
+  }
+
+  factory AccumulateKeyBook.fromMap(Map<String, dynamic> map) {
+    return AccumulateKeyBook(
+      id: map['id'],
+      identityId: map['identity_id'],
+      name: map['name'],
+      url: map['url'],
+      publicKeyHash: map['public_key_hash'],
+      isActive: map['is_active'] == 1,
+      metadata: map['metadata'] != null ? _decodeMetadata(map['metadata']) : null,
+    );
+  }
+}
+
+/// KeyPage model for key management hierarchy
+class AccumulateKeyPage {
+  final int? id;
+  final int keyBookId;
+  final String name;
+  final String url;
+  final int keysRequired;
+  final int keysRequiredOf;
+  final bool isActive;
+  final Map<String, dynamic>? metadata;
+
+  AccumulateKeyPage({
+    this.id,
+    required this.keyBookId,
+    required this.name,
+    required this.url,
+    this.keysRequired = 1,
+    this.keysRequiredOf = 1,
+    this.isActive = true,
+    this.metadata,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'key_book_id': keyBookId,
+      'name': name,
+      'url': url,
+      'keys_required': keysRequired,
+      'keys_required_of': keysRequiredOf,
+      'is_active': isActive ? 1 : 0,
+      'metadata': metadata != null ? _encodeMetadata(metadata!) : null,
+    };
+  }
+
+  factory AccumulateKeyPage.fromMap(Map<String, dynamic> map) {
+    return AccumulateKeyPage(
+      id: map['id'],
+      keyBookId: map['key_book_id'],
+      name: map['name'],
+      url: map['url'],
+      keysRequired: map['keys_required'] ?? 1,
+      keysRequiredOf: map['keys_required_of'] ?? 1,
+      isActive: map['is_active'] == 1,
+      metadata: map['metadata'] != null ? _decodeMetadata(map['metadata']) : null,
+    );
+  }
+}
+
+/// Key model for cryptographic keys
+class AccumulateKey {
+  final int? id;
+  final int keyPageId;
+  final String name;
+  final String publicKey;
+  final String privateKeyEncrypted;
+  final String? publicKeyHash;
+  final bool isDefault;
+  final bool isActive;
+  final Map<String, dynamic>? metadata;
+
+  AccumulateKey({
+    this.id,
+    required this.keyPageId,
+    required this.name,
+    required this.publicKey,
+    required this.privateKeyEncrypted,
+    this.publicKeyHash,
+    this.isDefault = false,
+    this.isActive = true,
+    this.metadata,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'key_page_id': keyPageId,
+      'nickname': name,
+      'public_key': publicKey,
+      'private_key_encrypted': privateKeyEncrypted,
+      'public_key_hash': publicKeyHash,
+      'is_default': isDefault ? 1 : 0,
+      'is_active': isActive ? 1 : 0,
+      'metadata': metadata != null ? _encodeMetadata(metadata!) : null,
+    };
+  }
+
+  factory AccumulateKey.fromMap(Map<String, dynamic> map) {
+    return AccumulateKey(
+      id: map['id'],
+      keyPageId: map['key_page_id'],
+      name: map['nickname'],
+      publicKey: map['public_key'],
+      privateKeyEncrypted: map['private_key_encrypted'],
+      publicKeyHash: map['public_key_hash'],
+      isDefault: map['is_default'] == 1,
+      isActive: map['is_active'] == 1,
+      metadata: map['metadata'] != null ? _decodeMetadata(map['metadata']) : null,
+    );
+  }
+}
+
+/// Custom Token model for user-created tokens
+class AccumulateCustomToken {
+  final int? id;
+  final String name;
+  final String symbol;
+  final String url;
+  final int precision;
+  final int? creatorIdentityId;
+  final Map<String, dynamic>? metadata;
+
+  AccumulateCustomToken({
+    this.id,
+    required this.name,
+    required this.symbol,
+    required this.url,
+    this.precision = 8,
+    this.creatorIdentityId,
+    this.metadata,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'symbol': symbol,
+      'url': url,
+      'precision': precision,
+      'creator_identity_id': creatorIdentityId,
+      'metadata': metadata != null ? _encodeMetadata(metadata!) : null,
+    };
+  }
+
+  factory AccumulateCustomToken.fromMap(Map<String, dynamic> map) {
+    return AccumulateCustomToken(
+      id: map['id'],
+      name: map['name'],
+      symbol: map['symbol'],
+      url: map['url'],
+      precision: map['precision'] ?? 8,
+      creatorIdentityId: map['creator_identity_id'],
+      metadata: map['metadata'] != null ? _decodeMetadata(map['metadata']) : null,
+    );
+  }
+}
+
+/// Data Account model for data storage
+class AccumulateDataAccount {
+  final int? id;
+  final String name;
+  final String url;
+  final int parentIdentityId;
+  final bool isActive;
+  final Map<String, dynamic>? metadata;
+
+  AccumulateDataAccount({
+    this.id,
+    required this.name,
+    required this.url,
+    required this.parentIdentityId,
+    this.isActive = true,
+    this.metadata,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'url': url,
+      'parent_identity_id': parentIdentityId,
+      'is_active': isActive ? 1 : 0,
+      'metadata': metadata != null ? _encodeMetadata(metadata!) : null,
+    };
+  }
+
+  factory AccumulateDataAccount.fromMap(Map<String, dynamic> map) {
+    return AccumulateDataAccount(
+      id: map['id'],
+      name: map['name'],
+      url: map['url'],
+      parentIdentityId: map['parent_identity_id'],
+      isActive: map['is_active'] == 1,
+      metadata: map['metadata'] != null ? _decodeMetadata(map['metadata']) : null,
     );
   }
 }
