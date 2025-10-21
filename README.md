@@ -215,7 +215,18 @@ This is an open-source foundation. Feel free to:
 
 ## License
 
-[Add your license here]
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+### MIT License Summary
+
+- ✅ **Commercial use** - Use this code in commercial projects
+- ✅ **Modification** - Modify the code to fit your needs
+- ✅ **Distribution** - Distribute the code and your modifications
+- ✅ **Private use** - Use the code for private purposes
+- ❌ **Warranty** - No warranty provided
+- ❌ **Liability** - Authors not liable for any damages
+
+**Attribution Required**: Include the original license notice in any substantial portions of the code.
 
 ## Resources
 
