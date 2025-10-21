@@ -148,6 +148,27 @@ BUILD_STATUS.md
 COMPILATION_STATUS.md
 IMPLEMENTATION_SUMMARY.md
 
+# ===== ADDITIONAL PROJECT-SPECIFIC FILES =====
+
+# Claude Code assistant files and directories
+.claude/
+*.claude
+
+# Development logs that may contain debug info
+flutter_*.log
+*.log
+
+# IntelliJ IDEA project files (beyond standard .idea/)
+*.iml
+accumulate_lite_wallet_clean.iml
+
+# DevTools options (may contain local paths)
+devtools_options.yaml
+
+# Local development configuration
+.vscode/settings.json
+.vscode/launch.json
+
 # Test data with potentially sensitive info
 test_data/
 mock_data/
