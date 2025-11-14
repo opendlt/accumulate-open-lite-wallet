@@ -19,11 +19,11 @@ class EnhancedAccumulateService {
   EnhancedAccumulateService({
     String? baseUrl,  // Make optional
     required KeyManagementService keyService,
-  }) : _acmeClient = ACMEClient(AppConstants.defaultAccumulateDevnetUrl),  // Always use devnet
+  }) : _acmeClient = ACMEClient(AppConstants.defaultAccumulateKermitTestnetUrl),  // Always use Kermit testnet
        _networkService = NetworkService(),
        _keyService = keyService,
-       _baseUrl = AppConstants.defaultAccumulateDevnetUrl {  // Always use devnet
-    debugPrint('Enhanced Accumulate Service initialized with endpoint: ${AppConstants.defaultAccumulateDevnetUrl}');
+       _baseUrl = AppConstants.defaultAccumulateKermitTestnetUrl {  // Always use Kermit testnet
+    debugPrint('Enhanced Accumulate Service initialized with endpoint: ${AppConstants.defaultAccumulateKermitTestnetUrl}');
   }
 
   /// Get the base URL for this service

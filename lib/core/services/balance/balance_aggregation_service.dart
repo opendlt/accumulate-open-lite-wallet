@@ -8,7 +8,7 @@ import 'dart:convert';
 
 class BalanceAggregationService {
   final DatabaseHelper _dbHelper;
-  static const String _apiUrl = AppConstants.defaultAccumulateDevnetUrl;
+  static const String _apiUrl = AppConstants.defaultAccumulateKermitTestnetUrl;
 
   // Simple rate limiting - max once every 30 seconds
   static DateTime? _lastBalanceCheck;

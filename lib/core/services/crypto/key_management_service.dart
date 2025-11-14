@@ -157,7 +157,7 @@ class KeyManagementService {
     try {
       // Get the current version for this signer from the network
       debugPrint('ADI SIGNER: Querying key page version from network...');
-      final client = ACMEClient(AppConstants.defaultAccumulateDevnetUrl); // Use Android emulator endpoint
+      final client = ACMEClient(AppConstants.defaultAccumulateKermitTestnetUrl); // Use Kermit testnet endpoint
       final response = await client.queryUrl(keyPageUrl);
 
       if (response['result'] != null && response['result']['data'] != null) {

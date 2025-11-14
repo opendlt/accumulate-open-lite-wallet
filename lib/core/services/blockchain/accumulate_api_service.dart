@@ -12,7 +12,7 @@ class AccumulateApiService {
   final NetworkService _networkService;
 
   AccumulateApiService({
-    this.baseUrl = AppConstants.defaultAccumulateDevnetUrl,
+    this.baseUrl = AppConstants.defaultAccumulateKermitTestnetUrl,
   }) : _networkService = NetworkService() {
     debugPrint('Accumulate API Service initialized with endpoint: $baseUrl');
   }

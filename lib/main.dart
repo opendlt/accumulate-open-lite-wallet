@@ -435,8 +435,8 @@ class _BasicWalletInterfaceState extends State<BasicWalletInterface> {
                     },
                   ),
                   RadioListTile<String>(
-                    title: const Text('Testnet'),
-                    subtitle: const Text('https://testnet.accumulatenetwork.io/'),
+                    title: const Text('Kermit Testnet'),
+                    subtitle: const Text('https://kermit.accumulatenetwork.io/'),
                     value: 'Testnet',
                     groupValue: tempSelectedNetwork,
                     onChanged: (String? value) {
@@ -885,7 +885,7 @@ class _HomeScreenState extends State<_HomeScreen> {
       // Always try to get balance for token accounts - the query will determine if it has a balance
       // This handles both lite accounts ending with /ACME and ADI token accounts
 
-      final client = ACMEClient(AppConstants.defaultAccumulateDevnetUrl);
+      final client = ACMEClient(AppConstants.defaultAccumulateKermitTestnetUrl);
       final response = await client.queryUrl(accountAddress);
 
       if (response['result'] != null && response['result']['data'] != null) {
@@ -3214,7 +3214,7 @@ class _CreateScreenState extends State<_CreateScreen> {
       final accumulateService = EnhancedAccumulateService(keyService: keyService);
 
       // Use the same client as the enhanced service
-      final client = ACMEClient(AppConstants.defaultAccumulateDevnetUrl);
+      final client = ACMEClient(AppConstants.defaultAccumulateKermitTestnetUrl);
 
       // Query directory to get existing key pages
       final qp = QueryPagination()

@@ -3,18 +3,20 @@
 import 'package:flutter/material.dart';
 
 class AppConstants {
-  // Network URLs - Only devnet for now
-  static const String defaultAccumulateDevnetUrl =
-      'http://10.0.2.2:26660/v2';  // Use 10.0.2.2 for Android emulator to reach host localhost
-  // Commented out other networks - using devnet only
-  // static const String defaultAccumulateTestnetUrl =
-  //     'https://testnet.accumulatenetwork.io/v3';
+  // Network URLs - Using Kermit testnet
+  static const String defaultAccumulateTestnetUrl =
+      'https://testnet.accumulatenetwork.io/v2';
+  static const String defaultAccumulateKermitTestnetUrl =
+      'https://kermit.accumulatenetwork.io/v2';  // Kermit testnet endpoint
+  // Commented out other networks - using testnet only
+  // static const String defaultAccumulateDevnetUrl =
+  //     'http://10.0.2.2:26660/v2';  // Use 10.0.2.2 for Android emulator to reach host localhost
   // static const String defaultMainnetUrl =
   //     'https://mainnet.accumulatenetwork.io/v3';
 
   // Explorer URLs
   static const String testnetExplorerBaseUrl =
-      'https://explorer.testnet.accumulatenetwork.io';
+      'https://kermit.explorer.accumulatenetwork.io';  // Kermit testnet explorer
   static const String mainnetExplorerBaseUrl =
       'https://explorer.accumulatenetwork.io';
 
