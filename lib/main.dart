@@ -280,7 +280,7 @@ class BasicWalletInterface extends StatefulWidget {
 
 class _BasicWalletInterfaceState extends State<BasicWalletInterface> {
   int _currentIndex = 0;
-  String _selectedNetwork = 'Devnet';
+  String _selectedNetwork = 'Testnet'; // Default to Testnet (Kermit)
 
   final List<Widget> _screens = [
     const _HomeScreen(),
@@ -412,6 +412,7 @@ class _BasicWalletInterfaceState extends State<BasicWalletInterface> {
   }
 
   void _showNetworkEndpointModal() {
+    final scaffoldContext = context; // Store the original context
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -468,13 +469,17 @@ class _BasicWalletInterfaceState extends State<BasicWalletInterface> {
                     this.setState(() {
                       _selectedNetwork = tempSelectedNetwork;
                     });
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Network switched to $_selectedNetwork'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
                     Navigator.of(context).pop();
+
+                    // Show SnackBar using the original context
+                    Future.microtask(() {
+                      ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+                        SnackBar(
+                          content: Text('Network switched to $_selectedNetwork'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    });
                   },
                   child: const Text('Apply'),
                 ),
@@ -595,7 +600,12 @@ class _BasicWalletInterfaceState extends State<BasicWalletInterface> {
                         memo: 'Faucet test tokens',
                       );
 
-                      debugPrint('Faucet response: $response');
+                      debugPrint('Faucet response - Success: ${response.success}');
+                      if (!response.success && response.error != null) {
+                        debugPrint('Faucet error: ${response.error}');
+                      } else if (response.success) {
+                        debugPrint('Faucet success - TxID: ${response.transactionId}');
+                      }
                       ScaffoldMessenger.of(parentContext).hideCurrentSnackBar();
 
                       if (response.success) {
